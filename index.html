@@ -40,6 +40,22 @@
       background: #f0f2ff;
       border-bottom: 1px solid #ddd;
     }
+    .key-section label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #444;
+    }
+    .key-section select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      background: white;
+    }
     .key-section button {
       width: 100%;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -157,8 +173,13 @@
       <p>Tu asistente personal con IA</p>
     </div>
 
-    <!-- SECCIÓN API KEY -->
+    <!-- SECCIÓN API KEY CON SELECTOR DE SERVICIO -->
     <div class="key-section">
+      <label>Elige el servicio:</label>
+      <select id="servicio">
+        <option value="ia">🤖 Plebot (IA)</option>
+        <option value="pinterest">📌 Pinterest</option>
+      </select>
       <button id="genKeyBtn" onclick="generarKey()">🔑 Generar mi API Key</button>
       <div class="key-display" id="keyDisplay"></div>
       <button class="copy-btn" id="copyBtn" onclick="copiarKey()" style="display:none;">📋 Copiar Key</button>
@@ -199,6 +220,7 @@
 
     async function generarKey() {
       const btn = document.getElementById('genKeyBtn');
+      const servicio = document.getElementById('servicio').value;
       btn.disabled = true;
       btn.textContent = '⏳ Generando...';
 
@@ -206,14 +228,14 @@
         const res = await fetch(`${WORKER_URL}/api-keys`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
+          body: JSON.stringify({ servicio: servicio })
         });
 
         const data = await res.json();
 
         if (data.api_key) {
           apiKey = data.api_key;
-          localStorage.setItem('plebot_key', apiKey); // guarda la key en el navegador
+          localStorage.setItem('plebot_key', apiKey);
 
           const display = document.getElementById('keyDisplay');
           display.textContent = apiKey;
@@ -225,8 +247,7 @@
           sendBtn.disabled = false;
           input.focus();
 
-          // Aviso en el chat
-          addMessage('✅ API Key generada. ¡Ya puedes chatear con Plebot!', 'system');
+          addMessage(`✅ API Key generada para: ${servicio === 'ia' ? 'Plebot (IA)' : 'Pinterest'}`, 'system');
         } else {
           btn.textContent = '❌ Error';
           alert('Error: ' + JSON.stringify(data));
@@ -289,7 +310,6 @@
       }
     }
 
-    // Al cargar la página: si ya hay una key guardada, restaurarla
     window.addEventListener('load', () => {
       const saved = localStorage.getItem('plebot_key');
       if (saved) {
@@ -301,6 +321,11 @@
         document.getElementById('genKeyBtn').textContent = '✅ Key ya generada';
         input.disabled = false;
         sendBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
       }
     });
   </script>
