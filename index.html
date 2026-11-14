@@ -15,13 +15,13 @@
       align-items: center;
       padding: 20px;
     }
-    .chat-container {
+    .container {
       background: white;
       border-radius: 20px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       width: 100%;
       max-width: 600px;
-      height: 80vh;
+      height: 85vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -34,6 +34,46 @@
     }
     .header h1 { font-size: 1.5rem; margin-bottom: 5px; }
     .header p { font-size: 0.85rem; opacity: 0.9; }
+
+    .key-section {
+      padding: 15px 20px;
+      background: #f0f2ff;
+      border-bottom: 1px solid #ddd;
+    }
+    .key-section button {
+      width: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .key-section button:hover { opacity: 0.9; }
+    .key-section button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .key-display {
+      display: none;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 0.7rem;
+      font-family: monospace;
+      word-break: break-all;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    .key-display.show { display: block; }
+    .copy-btn {
+      background: #4caf50 !important;
+      margin-top: 8px !important;
+      font-size: 0.9rem !important;
+      padding: 8px !important;
+    }
+
     .messages {
       flex: 1;
       overflow-y: auto;
@@ -69,6 +109,15 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     .message.bot.typing { color: #999; font-style: italic; }
+    .message.system {
+      background: #fff3cd;
+      color: #856404;
+      align-self: center;
+      font-size: 0.85rem;
+      max-width: 90%;
+      text-align: center;
+    }
+
     .input-area {
       display: flex;
       padding: 16px;
@@ -102,28 +151,38 @@
   </style>
 </head>
 <body>
-  <div class="chat-container">
+  <div class="container">
     <div class="header">
       <h1>🤖 Plebot</h1>
       <p>Tu asistente personal con IA</p>
     </div>
-    <div class="messages" id="messages">
-      <div class="message bot">¡Hola! Soy Plebot. ¿En qué puedo ayudarte hoy?</div>
+
+    <!-- SECCIÓN API KEY -->
+    <div class="key-section">
+      <button id="genKeyBtn" onclick="generarKey()">🔑 Generar mi API Key</button>
+      <div class="key-display" id="keyDisplay"></div>
+      <button class="copy-btn" id="copyBtn" onclick="copiarKey()" style="display:none;">📋 Copiar Key</button>
     </div>
+
+    <!-- CHAT -->
+    <div class="messages" id="messages">
+      <div class="message system">Genera tu API Key arriba para empezar a chatear con Plebot.</div>
+    </div>
+
     <div class="input-area">
-      <input type="text" id="input" placeholder="Escribe tu mensaje..." autocomplete="off">
-      <button id="send" onclick="sendMessage()">Enviar</button>
+      <input type="text" id="input" placeholder="Escribe tu mensaje..." autocomplete="off" disabled>
+      <button id="send" onclick="sendMessage()" disabled>Enviar</button>
     </div>
   </div>
 
   <script>
-    // ⚠️ REEMPLAZA ESTO con la URL de tu Worker de Cloudflare
-    const WORKER_URL = "https://mi-proxy-groq.tequieroopti.workers.dev/";
+    const WORKER_URL = "https://mi-proxy-groq.tequieroopti.workers.dev";
+    let apiKey = null;
+    let conversation = [];
 
     const messagesDiv = document.getElementById('messages');
     const input = document.getElementById('input');
     const sendBtn = document.getElementById('send');
-    let conversation = [];
 
     input.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !sendBtn.disabled) sendMessage();
@@ -138,7 +197,61 @@
       return div;
     }
 
+    async function generarKey() {
+      const btn = document.getElementById('genKeyBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Generando...';
+
+      try {
+        const res = await fetch(`${WORKER_URL}/api-keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+
+        const data = await res.json();
+
+        if (data.api_key) {
+          apiKey = data.api_key;
+          localStorage.setItem('plebot_key', apiKey); // guarda la key en el navegador
+
+          const display = document.getElementById('keyDisplay');
+          display.textContent = apiKey;
+          display.classList.add('show');
+          document.getElementById('copyBtn').style.display = 'block';
+
+          btn.textContent = '✅ Key generada';
+          input.disabled = false;
+          sendBtn.disabled = false;
+          input.focus();
+
+          // Aviso en el chat
+          addMessage('✅ API Key generada. ¡Ya puedes chatear con Plebot!', 'system');
+        } else {
+          btn.textContent = '❌ Error';
+          alert('Error: ' + JSON.stringify(data));
+        }
+      } catch (err) {
+        btn.textContent = '❌ Error de conexión';
+        console.error(err);
+      }
+    }
+
+    function copiarKey() {
+      if (!apiKey) return;
+      navigator.clipboard.writeText(apiKey).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ ¡Copiada!';
+        setTimeout(() => btn.textContent = '📋 Copiar Key', 2000);
+      });
+    }
+
     async function sendMessage() {
+      if (!apiKey) {
+        alert('Primero genera tu API Key');
+        return;
+      }
+
       const text = input.value.trim();
       if (!text) return;
 
@@ -152,16 +265,19 @@
       try {
         const res = await fetch(WORKER_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
           body: JSON.stringify({ messages: conversation })
         });
 
         const data = await res.json();
         typing.remove();
 
-        const reply = data.choices?.[0]?.message?.content || 'Error al responder.';
+        const reply = data.choices?.[0]?.message?.content || data.error || 'Error al responder.';
         addMessage(reply, 'bot');
-        conversation.push({ role: 'assistant', content: reply });
+        if (data.choices) conversation.push({ role: 'assistant', content: reply });
 
       } catch (err) {
         typing.remove();
@@ -172,6 +288,21 @@
         input.focus();
       }
     }
+
+    // Al cargar la página: si ya hay una key guardada, restaurarla
+    window.addEventListener('load', () => {
+      const saved = localStorage.getItem('plebot_key');
+      if (saved) {
+        apiKey = saved;
+        const display = document.getElementById('keyDisplay');
+        display.textContent = saved;
+        display.classList.add('show');
+        document.getElementById('copyBtn').style.display = 'block';
+        document.getElementById('genKeyBtn').textContent = '✅ Key ya generada';
+        input.disabled = false;
+        sendBtn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
